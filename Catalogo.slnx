@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Catalogo.Api/Catalogo.Api.csproj" />
+  <Project Path="Catalogo.AppService/Catalogo.AppService.csproj" />
+  <Project Path="Catalogo.Dominio/Catalogo.Dominio.csproj" />
+  <Project Path="Catalogo.Infra/Catalogo.Infra.csproj" />
+</Solution>
