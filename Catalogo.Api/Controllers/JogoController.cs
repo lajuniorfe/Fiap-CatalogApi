@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace Catalogo.Api.Controllers
 {
 
+    [ApiController]
+    [Route("api/[Controller]")]
     public class JogoController : ControllerBase
     {
         private readonly IJogoAppService _jogoAppService;
@@ -27,7 +29,7 @@ namespace Catalogo.Api.Controllers
         /// <response code="400">Requisição inválida</response>
         /// <response code="401">Usuário não autorizado</response>
         [HttpPost]
-        [Authorize(Policy = "Admin")]
+        //[Authorize(Policy = "Admin")]
         public IActionResult CadastrarJogo([FromBody] JogoRequest request)
         {
             _jogoAppService.CadastrarJogo(request);
@@ -59,18 +61,5 @@ namespace Catalogo.Api.Controllers
             return Ok(_jogoAppService.ListarJogos());
         }
 
-        [HttpPut]
-        public IActionResult AlterarJogo(Guid id, [FromBody] JogoRequest request)
-        {
-            _jogoAppService.AlterarJogo(id, request);
-            return NoContent();
-        }
-
-        [HttpDelete]
-        public IActionResult ExcluirJogo(Guid id)
-        {
-            _jogoAppService.ExcluirJogo(id);
-            return NoContent();
-        }
     }
 }

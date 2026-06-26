@@ -1,35 +1,57 @@
-﻿using Catalogo.AppService.BibliotecaJogos.DTOs.Responses;
+﻿using Catalogo.API.Events;
+using Catalogo.API.Messaging;
+using Catalogo.AppService.BibliotecaJogos.DTOs.Responses;
 using Catalogo.AppService.Bibliotecas.DTOs;
 using Catalogo.Dominio.Bibliotecas;
 using Catalogo.Dominio.Bibliotecas.Repository;
+using Catalogo.Dominio.Jogos;
+using Catalogo.Dominio.Jogos.Repository;
 using Catalogo.Infra.Logger;
 
 namespace Catalogo.AppService.Bibliotecas.Services
 {
-    public  class BibliotecaAppServices: IBibliotecaAppServices
+    public class BibliotecaAppServices : IBibliotecaAppServices
     {
         private readonly IBibliotecaRepository _bibliotecaRepository;
         private readonly BaseLogger<BibliotecaAppServices> _logger;
+        private readonly IMessageBus _publisher;
+        private readonly IJogoRepository jogoRepository;
 
-        public BibliotecaAppServices(IBibliotecaRepository bibliotecaRepository, BaseLogger<BibliotecaAppServices> logger)
+
+        public BibliotecaAppServices(IBibliotecaRepository bibliotecaRepository, BaseLogger<BibliotecaAppServices> logger, IMessageBus publisher, IJogoRepository jogoRepository)
         {
             _bibliotecaRepository = bibliotecaRepository;
             _logger = logger;
-
+            _publisher = publisher;
+            this.jogoRepository = jogoRepository;
         }
 
-        public void AdquirirJogo(AdquirirJogoRequest request)
+        public async Task PublicarOrdemPagamento(AdquirirJogoRequest request)
+        {
+            Jogo jogoRetornado = jogoRepository.ObterPorId(request.IdJogo);
+
+            var ordemPagamento = new OrderPlacedEvent()
+            {
+                GameId = request.IdJogo,
+                Price = jogoRetornado.Preco,
+                UserId = request.IdJogo,
+            };
+
+            await _publisher.PublishAsync("order-placed", ordemPagamento);
+        }
+
+        public async Task AdquirirJogo(PaymentProcessedEvent ev)
         {
             try
             {
-                Biblioteca biblioteca = _bibliotecaRepository.ObterPorUsuario(request.IdUsuario);
+                Biblioteca biblioteca = _bibliotecaRepository.ObterPorUsuario(ev.UserId);
 
                 if (biblioteca == null)
                 {
-                    biblioteca = CriarBibliotecaUsuario(request.IdUsuario);
+                    biblioteca = CriarBibliotecaUsuario(ev.UserId);
                 }
 
-                biblioteca.AdicionarJogo(request.IdJogo);
+                biblioteca.AdicionarJogo(ev.GameId);
 
                 _bibliotecaRepository.Alterar(biblioteca);
 
