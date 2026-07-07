@@ -7,27 +7,30 @@ namespace Catalogo.API.Consumers
     public class PaymentProcessedConsumer : BackgroundService
     {
         private readonly IMessageBus _messageBus;
-        private readonly IBibliotecaAppServices _appServices;
-
-        public PaymentProcessedConsumer(IMessageBus messageBus, IBibliotecaAppServices appServices)
+        private readonly IServiceScopeFactory _scopeFactory;
+        public PaymentProcessedConsumer(IMessageBus messageBus, IServiceScopeFactory scopeFactory)
         {
             _messageBus = messageBus;
-            _appServices = appServices;
+            _scopeFactory = scopeFactory;
         }
 
-        protected override  Task ExecuteAsync( CancellationToken stoppingToken)
+        protected override async Task ExecuteAsync( CancellationToken stoppingToken)
         {
-             _messageBus.SubscribeAsync<PaymentProcessedEvent>("payment-processed", IncluirJogoBiblioteca);
+            await _messageBus.SubscribeAsync<PaymentProcessedEvent>("payment-processed", IncluirJogoBiblioteca);
 
-            return Task.Delay(Timeout.Infinite, stoppingToken);
+            await Task.Delay(Timeout.Infinite, stoppingToken);
 
         }
 
         private async Task IncluirJogoBiblioteca(PaymentProcessedEvent ev)
         {
+            using var scope = _scopeFactory.CreateScope();
+
             if (ev.Status == "Aprovado")
             {
-                await _appServices.AdquirirJogo(ev);
+                var bibliotecaService = scope.ServiceProvider.GetRequiredService<IBibliotecaAppServices>();
+
+                await bibliotecaService.AdquirirJogo(ev);
             }
         }
     }

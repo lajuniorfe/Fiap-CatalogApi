@@ -7,34 +7,63 @@ namespace Catalogo.API.Messaging
 {
     public class RabbitMqMessageBus : IMessageBus
     {
-        private readonly IConnection _connection;
+        private readonly IConfiguration _configuration;
+        private IConnection? _connection;
         private IChannel? _channel;
 
         public RabbitMqMessageBus(IConfiguration configuration)
         {
-            var factory = new ConnectionFactory
-            {
-                HostName = configuration["RabbitMQ:Host"],
-                UserName = configuration["RabbitMQ:Username"],
-                Password = configuration["RabbitMQ:Password"]
-            };
-
-            _connection = factory.CreateConnectionAsync().Result;
-            _channel = _connection.CreateChannelAsync().Result;
+            _configuration = configuration;
         }
 
-        public async Task PublishAsync<T>(
-            string queueName,
-            T message)
+        public async Task EnsureConnectionAsync()
         {
-            await _channel.QueueDeclareAsync(
+            if (_connection != null && _connection.IsOpen)
+                return;
+
+            while (_connection == null || !_connection.IsOpen)
+            {
+                try
+                {
+                    var factory = new ConnectionFactory
+                    {
+                        HostName = _configuration["RabbitMQ:Host"],
+                        UserName = _configuration["RabbitMQ:Username"],
+                        Password = _configuration["RabbitMQ:Password"]
+                    };
+
+
+                    _connection = await factory.CreateConnectionAsync();
+
+                    _channel = await _connection.CreateChannelAsync();
+
+
+                    Console.WriteLine("RabbitMQ conectado.");
+
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(
+                        $"Falha ao conectar no RabbitMQ: {ex.Message}");
+
+                    await Task.Delay(
+                        TimeSpan.FromSeconds(5));
+                }
+            }
+
+        }
+
+        public async Task PublishAsync<T>(string queueName, T message)
+        {
+            await EnsureConnectionAsync();
+
+            await _channel!.QueueDeclareAsync(
                 queue: queueName,
                 durable: true,
                 exclusive: false,
                 autoDelete: false);
 
-            var body = Encoding.UTF8.GetBytes(
-                JsonSerializer.Serialize(message));
+            var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(message));
 
             await _channel.BasicPublishAsync(
                 exchange: "",
@@ -44,11 +73,11 @@ namespace Catalogo.API.Messaging
             await Task.CompletedTask;
         }
 
-        public Task SubscribeAsync<T>(
-            string queueName,
-            Func<T, Task> handler)
+        public async Task SubscribeAsync<T>(string queueName, Func<T, Task> handler)
         {
-            _channel.QueueDeclareAsync(
+            await EnsureConnectionAsync();
+
+            await _channel!.QueueDeclareAsync(
                 queue: queueName,
                 durable: true,
                 exclusive: false,
@@ -71,12 +100,12 @@ namespace Catalogo.API.Messaging
                 }
             };
 
-            _channel.BasicConsumeAsync(
+            await _channel!.BasicConsumeAsync(
                 queue: queueName,
                 autoAck: true,
                 consumer: consumer);
 
-            return Task.CompletedTask;
+            await Task.CompletedTask;
         }
     }
 }
