@@ -21,15 +21,14 @@ spec:
     spec:
       containers:
         - name: catalog-api
-          image: seuusuario/catalog-api:latest
+          image: lajunior/catalog-api:latest
           imagePullPolicy: IfNotPresent
 
           ports:
             - containerPort: 8080
 
-          env:
-            - name: ASPNETCORE_ENVIRONMENT
-              value: Development
-
-            - name: RabbitMQ__Host
-              value: rabbitmq
+          envFrom:
+            - configMapRef:
+                name: catalog-config
+            - secretRef:
+                name: catalog-secret
