@@ -4,6 +4,7 @@ using Catalogo.API.Consumers;
 using Catalogo.Infra.Context;
 using Catalogo.Infra.Logger;
 using Microsoft.EntityFrameworkCore;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -51,6 +52,10 @@ app.UseSwaggerUI(c =>
     c.SwaggerEndpoint("/swagger/v1/swagger.json", "Catalog API v1");
 
 });
+
+app.UseHttpMetrics();
+
+app.MapMetrics();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
