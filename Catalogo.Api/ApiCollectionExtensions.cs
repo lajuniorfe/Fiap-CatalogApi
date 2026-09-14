@@ -18,7 +18,7 @@ namespace Catalogo.Api
             services.AddTransient<IBibliotecaAppServices, BibliotecaAppServices>();
             services.AddTransient<IJogoRepository, JogoRepository>();
             services.AddTransient<IBibliotecaRepository, BibliotecaRepository>();
-            services.AddTransient<IMessageBus, RabbitMqMessageBus>();
+            services.AddTransient<IMessageBus, ServiceBusMessageBus>();
 
 
             services.AddTransient<ICorrelationIdGenerator, CorrelationIdGenerator>();

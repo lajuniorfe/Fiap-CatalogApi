@@ -1,37 +1,126 @@
-﻿using Catalogo.API.Events;
-using Catalogo.API.Messaging;
+﻿using Azure.Messaging.ServiceBus;
+using Catalogo.API.Events;
 using Catalogo.AppService.Bibliotecas.Services;
+using System.Text.Json;
 
 namespace Catalogo.API.Consumers
 {
     public class PaymentProcessedConsumer : BackgroundService
     {
-        private readonly IMessageBus _messageBus;
+        private readonly ServiceBusProcessor _processor;
         private readonly IServiceScopeFactory _scopeFactory;
-        public PaymentProcessedConsumer(IMessageBus messageBus, IServiceScopeFactory scopeFactory)
+        private readonly ILogger<PaymentProcessedConsumer> _logger;
+
+        public PaymentProcessedConsumer(IConfiguration configuration, IServiceScopeFactory scopeFactory, ILogger<PaymentProcessedConsumer> logger)
         {
-            _messageBus = messageBus;
             _scopeFactory = scopeFactory;
-        }
+            _logger = logger;
 
-        protected override async Task ExecuteAsync( CancellationToken stoppingToken)
-        {
-            await _messageBus.SubscribeAsync<PaymentProcessedEvent>("payment-processed", IncluirJogoBiblioteca);
+            var connectionString = configuration["ServiceBusConnection"]
+             ?? throw new InvalidOperationException("ServiceBusConnection não configurada.");
 
-            await Task.Delay(Timeout.Infinite, stoppingToken);
+            var client = new ServiceBusClient(connectionString);
 
-        }
-
-        private async Task IncluirJogoBiblioteca(PaymentProcessedEvent ev)
-        {
-            using var scope = _scopeFactory.CreateScope();
-
-            if (ev.Status == "Aprovado")
+            _processor = client.CreateProcessor("payment-processed", new ServiceBusProcessorOptions
             {
-                var bibliotecaService = scope.ServiceProvider.GetRequiredService<IBibliotecaAppServices>();
+                AutoCompleteMessages = false,
+                MaxConcurrentCalls = 1
+            });
+        }
 
-                await bibliotecaService.AdquirirJogo(ev);
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            _processor.ProcessMessageAsync += ProcessMessageAsync;
+            _processor.ProcessErrorAsync += ProcessErrorAsync;
+
+            await _processor.StartProcessingAsync(stoppingToken);
+
+            _logger.LogInformation("Consumer da fila payment-processed iniciado.");
+
+            try
+            {
+                await Task.Delay(
+                    Timeout.Infinite,
+                    stoppingToken);
+            }
+            catch (TaskCanceledException)
+            {
+                // Aplicação sendo encerrada
+            }
+
+        }
+
+        private async Task ProcessMessageAsync(ProcessMessageEventArgs args)
+        {
+            try
+            {
+                var json = args.Message.Body.ToString();
+
+                _logger.LogInformation("Mensagem recebida da fila payment-processed: {Message}", json);
+
+                var order = JsonSerializer.Deserialize<PaymentProcessedEvent>(json);
+
+                if (order == null)
+                {
+                    _logger.LogWarning("Não foi possível desserializar PaymentProcessedEvent.");
+
+                    await args.DeadLetterMessageAsync(
+                        args.Message,
+                        "Mensagem inválida",
+                        "Não foi possível desserializar PaymentProcessedEvent.");
+
+                    return;
+                }
+
+                using var scope =
+                    _scopeFactory.CreateScope();
+
+                var bibliotecaService =
+                    scope.ServiceProvider
+                        .GetRequiredService<IBibliotecaAppServices>();
+
+                if (order.Status == "Aprovado")
+                {
+                    await bibliotecaService.AdquirirJogo(order);
+                    await args.CompleteMessageAsync(args.Message);
+
+                    _logger.LogInformation("Jogo incluido com sucesso.");
+                }
+
+
+
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Erro ao processar mensagem da fila payment-processed.");
+
+                await args.AbandonMessageAsync(args.Message);
             }
         }
+
+        private Task ProcessErrorAsync(
+          ProcessErrorEventArgs args)
+        {
+            _logger.LogError(
+                args.Exception,
+                "Erro no Service Bus. Entity: {EntityPath}",
+                args.EntityPath);
+
+            return Task.CompletedTask;
+        }
+
+        public override async Task StopAsync(
+           CancellationToken cancellationToken)
+        {
+            await _processor.StopProcessingAsync(
+                cancellationToken);
+
+            await _processor.DisposeAsync();
+
+            await base.StopAsync(cancellationToken);
+        }
+
     }
 }
