@@ -7,6 +7,7 @@ using Catalogo.Dominio.Jogos.Repository;
 using Catalogo.Infra.Bibliotecas.Repository;
 using Catalogo.Infra.Jogos.Repository;
 using Catalogo.Infra.Logger;
+using Users.AppService.events;
 
 namespace Catalogo.Api
 {
@@ -18,7 +19,7 @@ namespace Catalogo.Api
             services.AddTransient<IBibliotecaAppServices, BibliotecaAppServices>();
             services.AddTransient<IJogoRepository, JogoRepository>();
             services.AddTransient<IBibliotecaRepository, BibliotecaRepository>();
-            services.AddTransient<IMessageBus, ServiceBusMessageBus>();
+            services.AddTransient<IMessageBus, RabbitMqMessageBus>();
 
 
             services.AddTransient<ICorrelationIdGenerator, CorrelationIdGenerator>();
