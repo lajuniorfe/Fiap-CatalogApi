@@ -6,6 +6,6 @@ namespace Catalogo.Dominio.Base
 {
     public class EntityBase
     {
-        public Guid Id { get; set; }
+        public Guid Id { get; set; } = Guid.NewGuid();
     }
 }

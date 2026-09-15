@@ -34,7 +34,7 @@ namespace Catalogo.AppService.Bibliotecas.Services
             {
                 GameId = request.IdJogo,
                 Price = jogoRetornado.Preco,
-                UserId = request.IdJogo,
+                UserId = request.IdUsuario,
             };
 
             await _publisher.PublishAsync("order-placed", ordemPagamento);
@@ -69,21 +69,27 @@ namespace Catalogo.AppService.Bibliotecas.Services
             Biblioteca bibliotecaRetornada = _bibliotecaRepository.ObterPorUsuario(idUsuario);
 
             if (bibliotecaRetornada == null)
-                throw new Exception("Não há biblioteca de jogos para esse usuário");
+                return null;
 
-            var response = new BibliotecaResponse()
+            var jogos = bibliotecaRetornada.BibliotecaJogos
+                .Select(bj => jogoRepository.ObterPorId(bj.JogoId))
+                .Where(jogo => jogo != null)
+                .Select(jogo => new BibliotecaJogoResponse
+                {
+                    Id = jogo.Id,
+                    Nome = jogo.Nome,
+                    Descricao = jogo.Descricao,
+                    DataAquisicao = bibliotecaRetornada.BibliotecaJogos
+                        .First(bj => bj.JogoId == jogo.Id)
+                        .DataAquisicao
+                })
+                .ToList();
+
+            return new BibliotecaResponse
             {
                 IdUsuario = idUsuario,
-                Jogos = bibliotecaRetornada.BibliotecaJogos.Select(bj => new BibliotecaJogoResponse
-                {
-                    Id = bj.Jogo.Id,
-                    Nome = bj.Jogo.Nome,
-                    Descricao = bj.Jogo.Descricao,
-                    DataAquisicao = bj.DataAquisicao
-                }).ToList()
+                Jogos = jogos
             };
-
-            return response;
         }
 
         private Biblioteca CriarBibliotecaUsuario(Guid idUsuario)

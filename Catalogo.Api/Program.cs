@@ -1,9 +1,11 @@
 using Catalogo.Api;
 using Catalogo.Api.Dominio.Base;
 using Catalogo.API.Consumers;
-using Catalogo.Infra.Context;
 using Catalogo.Infra.Logger;
-using Microsoft.EntityFrameworkCore;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.Serializers;
+using MongoDB.Driver;
 using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -25,13 +27,15 @@ builder.Services.AddTransient(typeof(BaseLogger<>));
 
 #endregion
 
+BsonSerializer.RegisterSerializer(new GuidSerializer(GuidRepresentation.Standard));
 #region Banco
+var mongoConnectionString = builder.Configuration["MongoDb:ConnectionString"];
+var mongoDatabaseName = builder.Configuration["MongoDb:DatabaseName"];
 
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-{
-    options.UseSqlite(
-        builder.Configuration.GetConnectionString("Default"));
-});
+var mongoClient = new MongoClient(mongoConnectionString);
+var mongoDatabase = mongoClient.GetDatabase(mongoDatabaseName);
+
+builder.Services.AddSingleton<IMongoDatabase>(mongoDatabase);
 
 #endregion
 
@@ -40,10 +44,10 @@ var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    db.Database.Migrate();
-    SeedData.Seed(db);
+    var database = scope.ServiceProvider.GetRequiredService<IMongoDatabase>();
+    SeedData.Seed(database);
 }
+
 
 app.UseSwagger();
 app.UseSwaggerUI(c =>

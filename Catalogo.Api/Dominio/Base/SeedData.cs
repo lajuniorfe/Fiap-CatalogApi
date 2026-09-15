@@ -1,22 +1,25 @@
 ﻿using Catalogo.Dominio.Jogos;
-using Catalogo.Infra.Context;
+using MongoDB.Driver;
 
 namespace Catalogo.Api.Dominio.Base
 {
     public static class SeedData
     {
-        public static void Seed(ApplicationDbContext context)
+        public static void Seed(IMongoDatabase database)
         {
-            if (context.Jogo.Any())
+            var collection = database.GetCollection<Jogo>("Jogo");
+
+            if (collection.Find(_ => true).Any())
                 return;
 
-            context.Jogo.AddRange(
+            var jogos = new List<Jogo>
+            {
                 new Jogo("God of War", "Aventura", 199.90m),
+                new Jogo("The Witcher 3", "RPG", 129.90m),
+                new Jogo("The Last Of Us", "Ação", 184.90m)
+            };
 
-                new Jogo( "The Witcher 3", "RPG", 129.90m)
-              );
-
-            context.SaveChanges();
+            collection.InsertMany(jogos);
         }
     }
 }

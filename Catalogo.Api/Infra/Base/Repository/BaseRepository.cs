@@ -1,44 +1,49 @@
 ﻿using Catalogo.Dominio.Base;
 using Catalogo.Dominio.Base.Repository;
-using Catalogo.Infra.Context;
-using Microsoft.EntityFrameworkCore;
+using MongoDB.Driver;
 
 namespace Catalogo.Infra.Base.Repository
 {
-    public class BaseRepository<T> : IBaseRepository<T> where T : EntityBase
+    public class BaseRepository<T> : IBaseRepository<T>  where T : EntityBase
     {
-        protected ApplicationDbContext _context;
-        protected DbSet<T> _dbSet;
+        protected readonly IMongoCollection<T> _collection;
 
-        public BaseRepository(ApplicationDbContext context)
+        public BaseRepository(IMongoDatabase database)
         {
-
-            _context = context;
-            _dbSet = _context.Set<T>();
+            _collection = database.GetCollection<T>(
+                typeof(T).Name);
         }
 
         public void Alterar(T entidade)
         {
-            _context.Update(entidade);
-            _context.SaveChanges();
+            _collection.ReplaceOne(
+                x => x.Id == entidade.Id,
+                entidade);
         }
 
         public void Cadastrar(T entidade)
         {
-            _context.Add(entidade);
-            _context.SaveChanges();
+            _collection.InsertOne(entidade);
         }
 
         public void Deletar(Guid id)
         {
-            _context.Remove(ObterPorId(id));
-            _context.SaveChanges();
+            _collection.DeleteOne(
+                x => x.Id == id);
         }
 
         public IList<T> ObterDados()
-            => _dbSet.ToList();
+        {
+            return _collection
+                .Find(_ => true)
+                .ToList();
+        }
 
         public T ObterPorId(Guid id)
-            => _dbSet.FirstOrDefault(entity => entity.Id == id);
+        {
+            return _collection
+                .Find(x => x.Id == id)
+                .FirstOrDefault();
+        }
     }
 }

@@ -21,5 +21,13 @@ namespace Catalogo.Api.Controllers
 
             return Ok();
         }
+
+        [HttpGet("{usuario}")]
+        public IActionResult RetornarBibliotecaUsuario(Guid usuario)
+        {
+           var lista = bibliotecaAppServices.ListarBibliotecaUsuario(usuario);
+
+            return Ok(lista);
+        }
     }
 }

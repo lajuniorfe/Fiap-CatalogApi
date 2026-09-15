@@ -1,15 +1,14 @@
 ﻿using Catalogo.Dominio.Jogos;
 using Catalogo.Dominio.Jogos.Repository;
 using Catalogo.Infra.Base.Repository;
-using Catalogo.Infra.Context;
+using MongoDB.Driver;
 
 namespace Catalogo.Infra.Jogos.Repository
 {
     public class JogoRepository : BaseRepository<Jogo>, IJogoRepository
     {
-        public JogoRepository(ApplicationDbContext context) : base(context)
+        public JogoRepository(IMongoDatabase database) : base(database)
         {
         }
-
     }
 }
